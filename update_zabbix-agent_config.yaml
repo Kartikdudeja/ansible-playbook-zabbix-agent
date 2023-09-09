@@ -1,0 +1,43 @@
+# Update Zabbix Agent Configuration with Ansible
+
+- name: "Configure Zabbix Agent"
+
+  hosts: all
+
+  gather_facts: false
+
+  # update these variable as per the need
+  vars:
+    # incase of HA Config, added multiple IP as comma-seprated, eg: "ZABBIX_SERVER_IP: "192.168.50.11,192.168.50.12""
+    ZABBIX_SERVER_IP: "192.168.50.11"
+    ZABBIX_AGENT_CONF_FILE: "/etc/zabbix/zabbix_agent2.conf"
+
+  tasks:
+
+    # update the zabbix server IP in the config file so the server can poll the agent
+    - name: "Update Zabbix Server IP in the Agent Config file"
+      replace:
+        path: "{{ ZABBIX_AGENT_CONF_FILE }}"
+        regexp: '^Server=[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'
+        replace: "Server={{ ZABBIX_SERVER_IP }}"
+
+      # notify handler to restart the zabbix-agent process
+      notify: restart_zabbix_agent
+
+    # allow configuration to run the Item key 'system.run'
+    - name: "Enabling Remote Command in Agent Config file"
+      replace:
+        path: "{{ ZABBIX_AGENT_CONF_FILE }}"
+        after: 'Option: DenyKey'
+        regexp: '^# DenyKey=system.run\[\*\]'
+        replace: 'AllowKey=system.run[*]'
+
+      # notify handler to restart the zabbix-agent process
+      notify: restart_zabbix_agent
+
+  # handler to restart the process if any change is made in the agent config file
+  handlers:
+    - name: restart_zabbix_agent
+      service:
+        name: zabbix-agent2
+        state: restarted
